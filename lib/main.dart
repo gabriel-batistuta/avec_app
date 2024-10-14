@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:process_run/shell.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart'; // Importando shared_preferences
 
 void main() {
   runApp(const MyApp());
@@ -32,17 +33,38 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String _output = ''; // To store the current line being displayed
-  List<String> _outputLines = []; // To store the entire output
-  int _currentLineIndex = 0; // To track the current line being displayed
-  Timer? _timer; // Timer to update the UI progressively
+  String _output = ''; // Para armazenar a saída do comando
+  List<String> _outputLines = []; // Para armazenar a saída completa
+  int _currentLineIndex = 0; // Para controlar a linha atual sendo exibida
+  Timer? _timer; // Timer para atualizar a UI progressivamente
 
-  // Function to execute a shell command and update the UI with the result
+  String _folderPath = ''; // Para armazenar o caminho da pasta
+  final TextEditingController _folderPathController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedFolderPath(); // Carregar o caminho salvo quando o app iniciar
+  }
+
+  Future<void> _loadSavedFolderPath() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _folderPath = prefs.getString('folderPath') ?? ''; // Carregar o caminho salvo
+      _folderPathController.text = _folderPath; // Atualizar o campo de texto com o valor salvo
+    });
+  }
+
+  Future<void> _saveFolderPath(String path) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('folderPath', path); // Salvar o caminho da pasta
+  }
+
   Future<void> _runCommand(String command) async {
     var shell = Shell();
     try {
       var result = await shell.run(command);
-      _outputLines = result.outText.split('\n'); // Split output by lines
+      _outputLines = result.outText.split('\n'); // Dividir a saída por linhas
       _startDisplayingOutput();
     } catch (e) {
       setState(() {
@@ -51,29 +73,52 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  // Function to display the output line by line, progressively
   void _startDisplayingOutput() {
     _currentLineIndex = 0;
     _output = '';
-    
-    _timer?.cancel(); // Cancel any existing timer
 
-    // Start a new timer that updates the displayed line every 500ms
+    _timer?.cancel(); // Cancelar qualquer timer existente
+
     _timer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_currentLineIndex < _outputLines.length) {
         setState(() {
-          _output = _outputLines[_currentLineIndex]; // Update the output with the current line
+          _output = _outputLines[_currentLineIndex]; // Atualizar a saída com a linha atual
         });
         _currentLineIndex++;
       } else {
-        timer.cancel(); // Stop the timer when all lines have been displayed
+        timer.cancel(); // Parar o timer quando todas as linhas forem exibidas
       }
     });
   }
 
+  // Função para baixar dependências
+  Future<void> _downloadDependencies() async {
+    if (_folderPath.isNotEmpty) {
+      String command = 'pip install -r $_folderPath/requirements.txt';
+      await _runCommand(command); // Rodar o comando e exibir a saída
+    } else {
+      setState(() {
+        _output = 'Please enter a valid folder path.';
+      });
+    }
+  }
+
+  // Função para rodar o programa
+  Future<void> _runProgram() async {
+    if (_folderPath.isNotEmpty) {
+      String command = 'python -u $_folderPath/main.py';
+      await _runCommand(command); // Rodar o comando e exibir a saída
+    } else {
+      setState(() {
+        _output = 'Please enter a valid folder path.';
+      });
+    }
+  }
+
   @override
   void dispose() {
-    _timer?.cancel(); // Dispose of the timer when the widget is destroyed
+    _timer?.cancel();
+    _folderPathController.dispose();
     super.dispose();
   }
 
@@ -88,17 +133,29 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            ElevatedButton(
-              onPressed: () => _runCommand('echo Hello World'),
-              child: const Text('Run echo Hello World'),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _folderPathController,
+                decoration: const InputDecoration(
+                  labelText: 'Enter Folder Path',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (value) {
+                  setState(() {
+                    _folderPath = value;
+                  });
+                  _saveFolderPath(value); // Salvar o caminho quando o usuário der enter
+                },
+              ),
             ),
             ElevatedButton(
-              onPressed: () => _runCommand('ls'),
-              child: const Text('Run ls'),
+              onPressed: _downloadDependencies, // Chama a função de baixar dependências
+              child: const Text('Baixar Dependências'),
             ),
             ElevatedButton(
-              onPressed: () => _runCommand('pwd'),
-              child: const Text('Run pwd'),
+              onPressed: _runProgram, // Chama a função de rodar o programa
+              child: const Text('Rodar Programa'),
             ),
             const SizedBox(height: 20),
             const Text(
