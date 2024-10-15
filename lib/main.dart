@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:process_run/shell.dart';
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart'; // Importando shared_preferences
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const MyApp());
@@ -50,8 +50,10 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _loadSavedFolderPath() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _folderPath = prefs.getString('folderPath') ?? ''; // Carregar o caminho salvo
-      _folderPathController.text = _folderPath; // Atualizar o campo de texto com o valor salvo
+      _folderPath =
+          prefs.getString('folderPath') ?? ''; // Carregar o caminho salvo
+      _folderPathController.text =
+          _folderPath; // Atualizar o campo de texto com o valor salvo
     });
   }
 
@@ -60,8 +62,34 @@ class _MyHomePageState extends State<MyHomePage> {
     await prefs.setString('folderPath', path); // Salvar o caminho da pasta
   }
 
-  Future<void> _runCommand(String command) async {
-    var shell = Shell();
+  // Função para rodar o comando com um diretório de trabalho definido
+  Future<void> _runProgram() async {
+    if (_folderPath.isNotEmpty) {
+      var shell = Shell(workingDirectory: _folderPath); // Define o diretório de trabalho
+      String command = 'python3 -u main.py'; // Apenas o comando
+      await _runCommand(command, shell); // Rodar o comando e exibir a saída
+    } else {
+      setState(() {
+        _output = 'Please enter a valid folder path.';
+      });
+    }
+  }
+
+  // Função para baixar dependências
+  Future<void> _downloadDependencies() async {
+    if (_folderPath.isNotEmpty) {
+      var shell = Shell(workingDirectory: _folderPath); // Define o diretório de trabalho
+      String command = 'pip install -r requirements.txt';
+      await _runCommand(command, shell); // Rodar o comando e exibir a saída
+    } else {
+      setState(() {
+        _output = 'Please enter a valid folder path.';
+      });
+    }
+  }
+
+  // Função para executar comandos e mostrar a saída
+  Future<void> _runCommand(String command, Shell shell) async {
     try {
       var result = await shell.run(command);
       _outputLines = result.outText.split('\n'); // Dividir a saída por linhas
@@ -82,37 +110,14 @@ class _MyHomePageState extends State<MyHomePage> {
     _timer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (_currentLineIndex < _outputLines.length) {
         setState(() {
-          _output = _outputLines[_currentLineIndex]; // Atualizar a saída com a linha atual
+          _output = _outputLines[
+              _currentLineIndex]; // Atualizar a saída com a linha atual
         });
         _currentLineIndex++;
       } else {
         timer.cancel(); // Parar o timer quando todas as linhas forem exibidas
       }
     });
-  }
-
-  // Função para baixar dependências
-  Future<void> _downloadDependencies() async {
-    if (_folderPath.isNotEmpty) {
-      String command = 'pip install -r $_folderPath/requirements.txt';
-      await _runCommand(command); // Rodar o comando e exibir a saída
-    } else {
-      setState(() {
-        _output = 'Please enter a valid folder path.';
-      });
-    }
-  }
-
-  // Função para rodar o programa
-  Future<void> _runProgram() async {
-    if (_folderPath.isNotEmpty) {
-      String command = 'python -u $_folderPath/main.py';
-      await _runCommand(command); // Rodar o comando e exibir a saída
-    } else {
-      setState(() {
-        _output = 'Please enter a valid folder path.';
-      });
-    }
   }
 
   @override
@@ -145,12 +150,14 @@ class _MyHomePageState extends State<MyHomePage> {
                   setState(() {
                     _folderPath = value;
                   });
-                  _saveFolderPath(value); // Salvar o caminho quando o usuário der enter
+                  _saveFolderPath(
+                      value); // Salvar o caminho quando o usuário der enter
                 },
               ),
             ),
             ElevatedButton(
-              onPressed: _downloadDependencies, // Chama a função de baixar dependências
+              onPressed:
+                  _downloadDependencies, // Chama a função de baixar dependências
               child: const Text('Baixar Dependências'),
             ),
             ElevatedButton(
@@ -165,7 +172,10 @@ class _MyHomePageState extends State<MyHomePage> {
             Text(
               _output,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, backgroundColor: Colors.black, color: Colors.white),
+              style: const TextStyle(
+                  fontSize: 16,
+                  backgroundColor: Colors.black,
+                  color: Colors.white),
             ),
           ],
         ),
